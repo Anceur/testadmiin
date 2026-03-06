@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Admin — Réponses des Amoureux 💕</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Lato:wght@300;400;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --rose:      #e8537a;
+    --rose-light:#f9c4d2;
+    --rose-pale: #fdf0f4;
+    --bordeaux:  #8b2252;
+    --gold:      #c9956c;
+    --cream:     #fdf6ef;
+    --text:      #3a1a28;
+    --muted:     #9e6b80;
+  }
+  body {
+    font-family: 'Lato', sans-serif;
+    background: var(--cream);
+    min-height: 100vh;
+    padding: 40px 20px 60px;
+    position: relative;
+  }
+  body::before {
+    content:'';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 70% 50% at 10% 10%, #f9c4d228 0%, transparent 55%),
+      radial-gradient(ellipse 60% 50% at 90% 90%, #e8537a15 0%, transparent 55%);
+    pointer-events: none;
+    z-index: 0;
+  }
+  .petal {
+    position: fixed;
+    background: radial-gradient(circle at 40% 35%, #f9c4d2, #e8537a88);
+    border-radius: 0 50% 50% 50%;
+    opacity: 0;
+    animation: fall linear infinite;
+    pointer-events: none;
+    z-index: 0;
+  }
+  @keyframes fall {
+    0%   { transform: translateY(-60px) rotate(0deg);   opacity: 0; }
+    10%  { opacity: 0.5; }
+    90%  { opacity: 0.3; }
+    100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+  }
+  .page-wrap { position: relative; z-index: 1; max-width: 780px; margin: 0 auto; }
+
+  /* HEADER */
+  .page-header { text-align: center; margin-bottom: 36px; animation: fadeDown .6s ease both; }
+  @keyframes fadeDown { from{opacity:0;transform:translateY(-16px)} to{opacity:1;transform:translateY(0)} }
+  .page-header .hearts { font-size: 1.5rem; letter-spacing: 8px; animation: pulse 2s infinite; display:block; margin-bottom: 10px; }
+  @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.18)} }
+  .page-header h1 { font-family:'Playfair Display',serif; font-style:italic; font-size:2rem; color:var(--bordeaux); margin-bottom:6px; }
+  .page-header p { font-size:.78rem; color:var(--muted); letter-spacing:2px; text-transform:uppercase; }
+
+  /* STATS */
+  .stats-bar { display:flex; gap:14px; margin-bottom:28px; animation:fadeDown .6s .1s ease both; }
+  .stat-card {
+    flex:1; background:rgba(255,255,255,0.8); backdrop-filter:blur(10px);
+    border:1px solid rgba(232,83,122,0.18); border-radius:16px; padding:16px;
+    text-align:center; box-shadow:0 4px 16px rgba(139,34,82,0.07);
+  }
+  .stat-num { font-family:'Playfair Display',serif; font-size:2rem; color:var(--rose); line-height:1; }
+  .stat-lbl { font-size:.7rem; color:var(--muted); text-transform:uppercase; letter-spacing:1.5px; margin-top:4px; }
+
+  /* LOADING */
+  #loading { text-align:center; padding:50px 0; color:var(--muted); font-style:italic; font-family:'Playfair Display',serif; font-size:1.1rem; }
+  .spinner { width:32px;height:32px; border:3px solid var(--rose-light); border-top-color:var(--rose); border-radius:50%; animation:spin .8s linear infinite; margin:0 auto 14px; }
+  @keyframes spin { to{transform:rotate(360deg)} }
+
+  /* CARDS */
+  .responses-grid { display:flex; flex-direction:column; gap:18px; }
+  .user-card {
+    background:rgba(255,255,255,0.82); backdrop-filter:blur(14px);
+    border:1px solid rgba(232,83,122,0.16); border-radius:22px;
+    overflow:hidden; box-shadow:0 4px 24px rgba(139,34,82,0.08);
+    animation:cardIn .5s ease both;
+  }
+  @keyframes cardIn { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+
+  .card-header {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:16px 22px;
+    background:linear-gradient(135deg,rgba(249,196,210,0.35),rgba(253,240,244,0.5));
+    border-bottom:1px solid rgba(232,83,122,0.12);
+    cursor:pointer; user-select:none; transition:background .2s;
+  }
+  .card-header:hover { background:linear-gradient(135deg,rgba(249,196,210,0.5),rgba(253,240,244,0.65)); }
+  .card-header-left { display:flex; align-items:center; gap:12px; }
+  .avatar {
+    width:38px;height:38px;
+    background:linear-gradient(135deg,var(--rose),var(--bordeaux));
+    border-radius:50%; display:flex; align-items:center; justify-content:center;
+    color:#fff; font-family:'Playfair Display',serif; font-size:.95rem; font-style:italic; flex-shrink:0;
+  }
+  .card-title { font-family:'Playfair Display',serif; font-style:italic; color:var(--bordeaux); font-size:1.05rem; }
+  .card-meta { font-size:.72rem; color:var(--muted); margin-top:2px; }
+  .toggle-icon { font-size:1rem; color:var(--rose); transition:transform .3s; flex-shrink:0; }
+  .toggle-icon.open { transform:rotate(180deg); }
+
+  /* BODY */
+  .card-body { max-height:0; overflow:hidden; transition:max-height .4s cubic-bezier(.22,1,.36,1); }
+  .card-body.open { max-height:3000px; }
+  .answers-list { padding:16px 22px 20px; display:flex; flex-direction:column; gap:8px; }
+  .answer-row {
+    display:flex; align-items:flex-start; gap:10px;
+    padding:9px 12px; border-radius:10px;
+    background:rgba(253,240,244,0.5); border-left:3px solid var(--rose-light); transition:border-color .2s;
+  }
+  .answer-row:hover { border-color:var(--rose); }
+  .answer-q { flex:1; font-size:.82rem; color:var(--muted); line-height:1.4; }
+  .answer-sep { color:var(--rose-light); font-size:.8rem; flex-shrink:0; margin-top:1px; }
+  .answer-a { font-size:.85rem; color:var(--bordeaux); font-weight:600; white-space:nowrap; flex-shrink:0; }
+
+  /* EMPTY */
+  .empty { text-align:center; padding:60px 0; color:var(--muted); }
+  .empty span { font-size:2.5rem; display:block; margin-bottom:14px; }
+  .empty p { font-family:'Playfair Display',serif; font-style:italic; font-size:1.1rem; }
+</style>
+</head>
+<body>
+
+<div class="page-wrap">
+  <header class="page-header">
+    <span class="hearts">&#9825; &#9829; &#9825;</span>
+    <h1>Réponses des Amoureux</h1>
+    <p>Tableau de bord administrateur</p>
+  </header>
+
+  <div class="stats-bar">
+    <div class="stat-card">
+      <div class="stat-num" id="stat-total">—</div>
+      <div class="stat-lbl">Réponses reçues</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num">50</div>
+      <div class="stat-lbl">Questions / quiz</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num" id="stat-latest">—</div>
+      <div class="stat-lbl">Dernier envoi</div>
+    </div>
+  </div>
+
+  <div id="loading">
+    <div class="spinner"></div>
+    Chargement des réponses…
+  </div>
+
+  <div id="responses" class="responses-grid"></div>
+</div>
+
+<script>
+  for(let i=0;i<12;i++){
+    const p=document.createElement('div');
+    p.className='petal';
+    p.style.cssText=`left:${Math.random()*100}vw;width:${8+Math.random()*9}px;height:${8+Math.random()*9}px;animation-duration:${6+Math.random()*8}s;animation-delay:${Math.random()*8}s;`;
+    document.body.appendChild(p);
+  }
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyBuN7Qwa7rfoCxLjBzl1OZ-Sp-z88vOvZ0",
+    authDomain: "test-274e2.firebaseapp.com",
+    databaseURL: "https://test-274e2-default-rtdb.firebaseio.com",
+    projectId: "test-274e2",
+    storageBucket: "test-274e2.firebasestorage.app",
+    messagingSenderId: "116747127759",
+    appId: "1:116747127759:web:e9901d06d359573e99e0ba"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  const container = document.getElementById("responses");
+  const loadingEl = document.getElementById("loading");
+  const statTotal = document.getElementById("stat-total");
+  const statLatest = document.getElementById("stat-latest");
+
+  db.ref("responses").on("value", snapshot => {
+    loadingEl.style.display = "none";
+    container.innerHTML = "";
+    const data = snapshot.val();
+
+    if (!data) {
+      container.innerHTML = '<div class="empty"><span>💌</span><p>Aucune réponse pour le moment…</p></div>';
+      statTotal.textContent = "0";
+      statLatest.textContent = "—";
+      return;
+    }
+
+    const entries = Object.values(data);
+    statTotal.textContent = entries.length;
+
+    const latest = entries.reduce((acc, e) => (e.timestamp > acc ? e.timestamp : acc), 0);
+    statLatest.textContent = latest
+      ? new Date(latest).toLocaleDateString('fr-FR', {day:'2-digit', month:'short'})
+      : "—";
+
+    entries.forEach((userAns, index) => {
+      const card = document.createElement("div");
+      card.className = "user-card";
+      card.style.animationDelay = (index * 0.06) + 's';
+
+      const ts = userAns.timestamp
+        ? new Date(userAns.timestamp).toLocaleString('fr-FR', {dateStyle:'medium', timeStyle:'short'})
+        : "Date inconnue";
+
+      const answersHTML = (userAns.answers || []).map(ans =>
+        `<div class="answer-row">
+          <span class="answer-q">${ans.question}</span>
+          <span class="answer-sep">&#9829;</span>
+          <span class="answer-a">${ans.answer}</span>
+        </div>`
+      ).join('');
+
+      card.innerHTML = `
+        <div class="card-header" onclick="toggle(this)">
+          <div class="card-header-left">
+            <div class="avatar">${index + 1}</div>
+            <div>
+              <div class="card-title">Participant · ${index + 1}</div>
+              <div class="card-meta">&#128197; ${ts} &nbsp;·&nbsp; ${(userAns.answers||[]).length} réponses</div>
+            </div>
+          </div>
+          <span class="toggle-icon">&#9662;</span>
+        </div>
+        <div class="card-body">
+          <div class="answers-list">${answersHTML}</div>
+        </div>`;
+
+      container.appendChild(card);
+    });
+  });
+
+  function toggle(header) {
+    const body = header.nextElementSibling;
+    const icon = header.querySelector('.toggle-icon');
+    body.classList.toggle('open');
+    icon.classList.toggle('open');
+  }
+</script>
+</body>
+</html>
